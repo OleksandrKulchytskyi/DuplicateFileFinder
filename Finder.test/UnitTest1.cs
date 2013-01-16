@@ -43,7 +43,7 @@ namespace Finder.test
 
 				var overall = (from item1 in list1
 							   from item2 in list2
-							   where item1.ShaCode.Equals(item2.ShaCode, StringComparison.OrdinalIgnoreCase)
+							   where item1.Equals(item2)
 							   select new { Path1 = item2.PathToFile, Path2 = item1.PathToFile, }).ToList();
 				if (overall.Count > 0)
 				{

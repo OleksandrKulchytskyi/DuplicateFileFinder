@@ -83,7 +83,7 @@ namespace FileHelper.Common
 	}
 
 
-	public class DuplicateItem
+	public class DuplicateItem : IEquatable<DuplicateItem>
 	{
 		[Description("File path")]
 		public string PathToFile { get; set; }
@@ -102,5 +102,12 @@ namespace FileHelper.Common
 
 		[Description("SHA code")]
 		public string ShaCode { get; set; }
+
+		public bool Equals(DuplicateItem other)
+		{
+			if (other == null)
+				return false;
+			return this.ShaCode.Equals(other.ShaCode, StringComparison.OrdinalIgnoreCase);
+		}
 	}
 }
