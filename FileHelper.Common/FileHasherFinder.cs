@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Security.AccessControl;
 using System.Security.Cryptography;
+using System.Security.Principal;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,6 +20,8 @@ namespace FileHelper.Common
 
 	public class FileHasherFinder : IFileHasherFinder
 	{
+		private const int _maxTolerance = 2;
+
 		public Task<IEnumerable<DuplicateItem>> DoSearch(string fpath, string pattern, bool includeSubFolders)
 		{
 			TaskCompletionSource<IEnumerable<DuplicateItem>> tcs = new TaskCompletionSource<IEnumerable<DuplicateItem>>();
@@ -32,31 +36,47 @@ namespace FileHelper.Common
 					IEnumerable<string> data = Directory.EnumerateFiles(path, pattern, includeSubFolders == true ?
 																		SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 					var parallelOption = new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = cts.Token };
-					try
+					using (ThreadLocal<LoopSt> retryCount = new ThreadLocal<LoopSt>(() => new LoopSt() { Exceptional = false, Count = 0 }))
 					{
-						Parallel.ForEach(data, parallelOption, file =>
+						try
 						{
-							if (parallelOption.CancellationToken.IsCancellationRequested)
-								parallelOption.CancellationToken.ThrowIfCancellationRequested();
-
-							try
+							Parallel.ForEach(data, parallelOption, file =>
 							{
-								if (System.IO.File.Exists(file))
+								retryCount.Value.Exceptional = false;
+								do
 								{
-									int flen = 0;
-									DuplicateItem item = new DuplicateItem();
-									item.ShaCode = GetHash(file, out flen);
-									item.PathToFile = file;
-									item.Size = flen;
-									blockColl.TryAdd(item, new TimeSpan(0, 0, 0, 0, 100));
-								}
-							}
-							catch (UnauthorizedAccessException) { }
-							catch (IOException) { }
-							catch (InvalidOperationException) { }
-						});
+									if (parallelOption.CancellationToken.IsCancellationRequested)
+										parallelOption.CancellationToken.ThrowIfCancellationRequested();
+
+									if (retryCount.Value.Exceptional)
+									{
+#if DEBUG
+										System.Diagnostics.Debug.WriteLine("Grant access for {0}", file);
+#endif
+										GrantAccess(file);
+									}
+									try
+									{
+										if (System.IO.File.Exists(file))
+										{
+											int flen = 0;
+											DuplicateItem item = new DuplicateItem();
+											item.ShaCode = GetHash(file, out flen);
+											item.PathToFile = file;
+											item.Size = flen;
+											blockColl.TryAdd(item, new TimeSpan(0, 0, 0, 0, 100));
+										}
+										retryCount.Value.Exceptional = false;
+										retryCount.Value.Count = 0;
+									}
+									catch (UnauthorizedAccessException) { retryCount.Value.Exceptional = true; retryCount.Value.Count++; }
+									catch (IOException) { }
+									catch (InvalidOperationException) { }
+								} while (retryCount.Value.Exceptional && (retryCount.Value.Count != _maxTolerance));
+							});
+						}
+						catch (OperationCanceledException) { tcs.SetCanceled(); }
 					}
-					catch (OperationCanceledException) { tcs.SetCanceled(); }
 					blockColl.CompleteAdding();
 					if (!cts.IsCancellationRequested)
 						tcs.TrySetResult(blockColl.GetConsumingEnumerable());
@@ -65,6 +85,9 @@ namespace FileHelper.Common
 
 				}), TaskCreationOptions.LongRunning);
 			}
+			else
+				tcs.TrySetResult(null);
+
 			return tcs.Task;
 		}
 
@@ -79,6 +102,27 @@ namespace FileHelper.Common
 				byte[] hash = sha.ComputeHash(data, 0, bytesRead);
 				return BitConverter.ToString(hash).Replace("-", String.Empty);
 			}
+		}
+
+		private static void GrantAccess(string filepath)
+		{
+
+			var fs = File.GetAccessControl(filepath);
+			var sid = fs.GetOwner(typeof(SecurityIdentifier));
+			var ntAccount = new NTAccount(Environment.UserDomainName, Environment.UserName);
+			try
+			{
+				var currentRules = fs.GetAccessRules(true, false, typeof(NTAccount));
+				foreach (var r in currentRules.OfType<FileSystemAccessRule>())
+				{
+					Console.WriteLine(string.Format("{0} {1}", r.AccessControlType, r.FileSystemRights));
+				}
+				var newRule = new FileSystemAccessRule(ntAccount, FileSystemRights.FullControl, AccessControlType.Allow);
+				fs.AddAccessRule(newRule);
+				File.SetAccessControl(filepath, fs);
+			}
+			catch { }
+			finally { fs = null; sid = null; ntAccount = null; }
 		}
 	}
 
@@ -109,5 +153,11 @@ namespace FileHelper.Common
 				return false;
 			return this.ShaCode.Equals(other.ShaCode, StringComparison.OrdinalIgnoreCase);
 		}
+	}
+
+	class LoopSt
+	{
+		public int Count { get; set; }
+		public bool Exceptional { get; set; }
 	}
 }
