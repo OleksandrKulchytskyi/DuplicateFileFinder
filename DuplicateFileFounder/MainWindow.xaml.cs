@@ -62,6 +62,9 @@ namespace DuplicateFileFounder
 			_listExtensions.Add("*.djvu");
 			_listExtensions.Add("*.mp3");
 			_listExtensions.Add("*.avi");
+			_listExtensions.Add("*.epub");
+			_listExtensions.Add("*.wmv");
+			_listExtensions.Add("*.mp4");
 
 			cmbExt.ItemsSource = _listExtensions;
 		}
@@ -91,6 +94,13 @@ namespace DuplicateFileFounder
 			string ext = cmbExt.SelectedItem as string;
 			if (System.IO.Directory.Exists(FolderPath) && !string.IsNullOrEmpty(ext))
 			{
+				if(blockColl!=null && blockColl.Count>0)
+				{
+					blockColl = null;
+					dg1.ItemsSource = null;
+					GC.Collect();
+				}
+
 				string path = FolderPath;
 
 				IsBusy = true;
