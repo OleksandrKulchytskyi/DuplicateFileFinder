@@ -12,7 +12,7 @@ namespace Finder.test
 		public void TestMethod1()
 		{
 			IFileHasherFinder finder = new FileHasherFinder();
-			var task = finder.DoSearch(@"d:\ebooks", "*.pdf", true);
+			var task = finder.DoSearch(@"D:\ebooks", "*.pdf", true);
 			var task2 = finder.DoSearch(@"D:\Dropbox\SkyDrive\eBooks", "*.pdf", true);
 
 			try

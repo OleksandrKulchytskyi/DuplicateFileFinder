@@ -72,7 +72,7 @@ namespace FileHelper.Common
 									catch (UnauthorizedAccessException) { retryCount.Value.Exceptional = true; retryCount.Value.Count++; }
 									catch (IOException) { }
 									catch (InvalidOperationException) { }
-								} while (retryCount.Value.Exceptional && (retryCount.Value.Count != _maxTolerance));
+								} while (retryCount.Value.Exceptional && (retryCount.Value.Count <= _maxTolerance));
 							});
 						}
 						catch (OperationCanceledException) { tcs.SetCanceled(); }
