@@ -93,20 +93,70 @@ namespace FileHelper.Common
 
 		private string GetHash(string filePath, out int len)
 		{
-			byte[] data = new byte[524288];
+			int bufferLen = 524288;
+			byte[] data = new byte[bufferLen];
 			using (SHA256Managed sha = new SHA256Managed())
-			using (FileStream fs = new FileStream(filePath, FileMode.Open))
 			{
-				len = (int)fs.Length;
-				int bytesRead = fs.Read(data, 0, data.Length);
-				byte[] hash = sha.ComputeHash(data, 0, bytesRead);
-				return BitConverter.ToString(hash).Replace("-", String.Empty);
+				using (var task = ReadFileAsync(filePath, bufferLen))
+				{
+					task.Wait();
+					len = task.Result.Item1;
+					byte[] hash = sha.ComputeHash(task.Result.Item3, 0, task.Result.Item2);
+					return BitConverter.ToString(hash).Replace("-", String.Empty);
+				}
 			}
 		}
 
-		private static void GrantAccess(string filepath)
+		public static Task<Tuple<int, int, byte[]>> ReadFileAsync(string filePath, int buffLength)
 		{
+			FileInfo fi = new FileInfo(filePath);
+			byte[] buffer = new byte[buffLength];
 
+			var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.None, buffer.Length, FileOptions.Asynchronous);
+			Task<int> task = Task<int>.Factory.FromAsync(fileStream.BeginRead, fileStream.EndRead, buffer, 0, buffer.Length, null);
+			return task.ContinueWith(t =>
+			{
+				var result = Tuple.Create<int, int, byte[]>((int)fileStream.Length, t.Result, buffer); ;
+				fileStream.Dispose();
+				t.Dispose();
+				return result;
+			});
+		}
+
+		public static Task<Tuple<byte[], int>> ReadBufferAsync(string file, int bufferSize)
+		{
+			TaskCompletionSource<Tuple<byte[], int>> tcs = new TaskCompletionSource<Tuple<byte[], int>>();
+			if (!File.Exists(file))
+			{
+				tcs.TrySetException(new FileNotFoundException("File was not found", file));
+			}
+			var buffer = new byte[bufferSize];
+			int read = -1;
+			FileStream fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None, bufferSize, FileOptions.Asynchronous);
+
+			Task<int> task = null;
+			try
+			{
+				task = Task.Factory.FromAsync<byte[], int, int, int>(fs.BeginRead, fs.EndRead, buffer, 0, buffer.Length - 1, null);
+				task.Wait();
+			}
+			catch (AggregateException ex)
+			{
+				tcs.TrySetException(ex.InnerException);
+			}
+			catch (Exception ex)
+			{
+				tcs.TrySetException(ex);
+			}
+
+			read = task.Result;
+			
+			tcs.TrySetResult(Tuple.Create(buffer, read));
+			return tcs.Task;
+		}
+
+		private void GrantAccess(string filepath)
+		{
 			var fs = File.GetAccessControl(filepath);
 			var sid = fs.GetOwner(typeof(SecurityIdentifier));
 			var ntAccount = new NTAccount(Environment.UserDomainName, Environment.UserName);
@@ -125,7 +175,6 @@ namespace FileHelper.Common
 			finally { fs = null; sid = null; ntAccount = null; }
 		}
 	}
-
 
 	public class DuplicateItem : IEquatable<DuplicateItem>
 	{
