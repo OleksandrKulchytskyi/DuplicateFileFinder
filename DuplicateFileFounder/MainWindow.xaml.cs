@@ -1,21 +1,17 @@
-﻿using System;
+﻿using FileHelper.Common;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel.Composition;
+using System.ComponentModel.Composition.Hosting;
+using System.IO;
 using System.Linq;
-using System.Text;
+using System.Security.Cryptography;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using System.Collections.ObjectModel;
-using System.Threading.Tasks;
-using System.IO;
-using System.Security.Cryptography;
-using System.Collections.Concurrent;
 
 namespace DuplicateFileFounder
 {
@@ -24,12 +20,23 @@ namespace DuplicateFileFounder
 	/// </summary>
 	public partial class MainWindow : Window
 	{
-		private BlockingCollection<DuplicateItem> blockColl = null;
-		List<string> _listExtensions = null;
+		private List<string> _listExtensions = null;
+		[Import(typeof(IFileHasherFinder))]
+		private IFileHasherFinder _finderCore;
+
 
 		public MainWindow()
 		{
 			InitializeComponent();
+
+			AggregateCatalog aggregateCatalogue = new AggregateCatalog();
+			aggregateCatalogue.Catalogs.Add(new AssemblyCatalog(System.Reflection.Assembly.GetExecutingAssembly()));
+			aggregateCatalogue.Catalogs.Add(new AssemblyCatalog(typeof(IFileHasherFinder).Assembly));
+			//aggregateCatalogue.Catalogs.Add(new DirectoryCatalog(AppDomain.CurrentDomain.BaseDirectory));
+			
+			CompositionContainer container = new CompositionContainer(aggregateCatalogue);
+			container.ComposeParts(this);
+			
 			_listExtensions = new List<string>();
 			this.Loaded += new RoutedEventHandler(MainWindow_Loaded);
 		}
@@ -43,7 +50,6 @@ namespace DuplicateFileFounder
 		public static readonly DependencyProperty FolderPathProperty =
 			DependencyProperty.Register("FolderPath", typeof(string), typeof(MainWindow), new UIPropertyMetadata(string.Empty));
 
-
 		public bool IsBusy
 		{
 			get { return (bool)GetValue(IsBusyProperty); }
@@ -54,8 +60,7 @@ namespace DuplicateFileFounder
 		public static readonly DependencyProperty IsBusyProperty =
 			DependencyProperty.Register("IsBusy", typeof(bool), typeof(MainWindow), new UIPropertyMetadata(false));
 
-
-		void MainWindow_Loaded(object sender, RoutedEventArgs e)
+		private void MainWindow_Loaded(object sender, RoutedEventArgs e)
 		{
 			_listExtensions.Add("*.jpg");
 			_listExtensions.Add("*.pdf");
@@ -65,6 +70,11 @@ namespace DuplicateFileFounder
 			_listExtensions.Add("*.epub");
 			_listExtensions.Add("*.wmv");
 			_listExtensions.Add("*.mp4");
+			_listExtensions.Add("*.cs");
+			_listExtensions.Add("*.cpp");
+			_listExtensions.Add("*.js");
+
+			_listExtensions.Sort();
 
 			cmbExt.ItemsSource = _listExtensions;
 		}
@@ -94,50 +104,25 @@ namespace DuplicateFileFounder
 			string ext = cmbExt.SelectedItem as string;
 			if (System.IO.Directory.Exists(FolderPath) && !string.IsNullOrEmpty(ext))
 			{
-				if(blockColl!=null && blockColl.Count>0)
+				if (dg1.ItemsSource != null && (dg1.ItemsSource as ObservableCollection<DuplicateItem>).Count > 0)
 				{
-					blockColl = null;
+					(dg1.ItemsSource as ObservableCollection<DuplicateItem>).Clear();
 					dg1.ItemsSource = null;
+					GC.Collect();
+					GC.WaitForPendingFinalizers();
 					GC.Collect();
 				}
 
 				string path = FolderPath;
-
 				IsBusy = true;
-				var mainTask = Task.Factory.StartNew(new Action(() =>
-					{
-						blockColl = new System.Collections.Concurrent.BlockingCollection<DuplicateItem>();
-						IEnumerable<string> data = System.IO.Directory.EnumerateFiles(path, ext, System.IO.SearchOption.AllDirectories);
 
-						Parallel.ForEach(data, new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, file =>
-							{
-								try
-								{
-									if (System.IO.File.Exists(file))
-									{
-										int flen = 0;
-										DuplicateItem item = new DuplicateItem();
-
-										item.ShaCode = GetHash(file, out flen);
-										item.PathToFile = file;
-										item.Size = flen;
-										blockColl.Add(item);
-									}
-								}
-								catch (UnauthorizedAccessException) { }
-								catch (IOException) { }
-								catch (InvalidOperationException) { }
-							});
-						blockColl.CompleteAdding();
-					}), TaskCreationOptions.LongRunning);
+				var mainTask = _finderCore.DoSearch(path, ext, true);
 
 				mainTask.ContinueWith(prevTask =>
 					{
 						IsBusy = false;
 						prevTask.Dispose();
-						dg1.ItemsSource = new ObservableCollection<DuplicateItem>(blockColl.AsEnumerable());
-						blockColl.Dispose();
-						blockColl = null;
+						dg1.ItemsSource = new ObservableCollection<DuplicateItem>(mainTask.Result);
 					}, System.Threading.CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion,
 					TaskScheduler.FromCurrentSynchronizationContext());
 
@@ -146,23 +131,8 @@ namespace DuplicateFileFounder
 					IsBusy = false;
 					dg1.ItemsSource = null;
 					prevTask.Dispose();
-					blockColl.Dispose();
-					blockColl = null;
 				}, System.Threading.CancellationToken.None, TaskContinuationOptions.NotOnRanToCompletion,
 					TaskScheduler.FromCurrentSynchronizationContext());
-			}
-		}
-
-		private string GetHash(string filePath, out int len)
-		{
-			byte[] data = new byte[524288];
-			using (SHA256Managed sha = new SHA256Managed())
-			using (FileStream fs = new FileStream(filePath, FileMode.Open))
-			{
-				len = (int)fs.Length;
-				int bytesRead = fs.Read(data, 0, data.Length);
-				byte[] hash = sha.ComputeHash(data, 0, bytesRead);
-				return BitConverter.ToString(hash).Replace("-", String.Empty);
 			}
 		}
 
@@ -181,7 +151,7 @@ namespace DuplicateFileFounder
 				if (MessageBox.Show(this, caption, "Delete", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
 				{
 					try
-				{	
+					{
 						File.Delete((dg1.SelectedItem as DuplicateItem).PathToFile);
 					}
 					catch (UnauthorizedAccessException) { }

@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.ComponentModel.Composition;
 using System.IO;
 using System.Linq;
 using System.Security.AccessControl;
@@ -18,6 +19,7 @@ namespace FileHelper.Common
 		Task<IEnumerable<DuplicateItem>> DoSearch(string fpath, string pattern, bool includeSubFolders);
 	}
 
+	[Export(typeof(IFileHasherFinder))]
 	public class FileHasherFinder : IFileHasherFinder
 	{
 		private const int _maxTolerance = 2;
