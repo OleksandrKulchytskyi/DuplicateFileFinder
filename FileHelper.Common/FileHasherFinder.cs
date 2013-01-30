@@ -72,12 +72,14 @@ namespace FileHelper.Common
 									catch (UnauthorizedAccessException) { retryCount.Value.Exceptional = true; retryCount.Value.Count++; }
 									catch (IOException) { }
 									catch (InvalidOperationException) { }
-								} while (retryCount.Value.Exceptional && (retryCount.Value.Count <= _maxTolerance));
+								}
+								while (retryCount.Value.Exceptional && (retryCount.Value.Count <= _maxTolerance));
 							});
 						}
 						catch (OperationCanceledException) { tcs.SetCanceled(); }
 					}
 					blockColl.CompleteAdding();
+
 					if (!cts.IsCancellationRequested)
 						tcs.TrySetResult(blockColl.GetConsumingEnumerable());
 					else
@@ -110,12 +112,20 @@ namespace FileHelper.Common
 		public static Task<Tuple<int, int, byte[]>> ReadFileAsync(string filePath, int buffLength)
 		{
 			FileInfo fi = new FileInfo(filePath);
+			if (!fi.Exists)
+				throw new FileNotFoundException("File was not found", filePath);
+			fi = null;
+
 			byte[] buffer = new byte[buffLength];
 
 			var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.None, buffer.Length, FileOptions.Asynchronous);
 			Task<int> task = Task<int>.Factory.FromAsync(fileStream.BeginRead, fileStream.EndRead, buffer, 0, buffer.Length, null);
 			return task.ContinueWith(t =>
 			{
+				// If we did not receive the entire file, the end of the data buffer will contain garbage. 
+				if (t.Result < buffer.Length)
+					Array.Resize(ref buffer, t.Result);
+
 				var result = Tuple.Create<int, int, byte[]>((int)fileStream.Length, t.Result, buffer); ;
 				fileStream.Dispose();
 				t.Dispose();
@@ -150,7 +160,7 @@ namespace FileHelper.Common
 			}
 
 			read = task.Result;
-			
+
 			tcs.TrySetResult(Tuple.Create(buffer, read));
 			return tcs.Task;
 		}

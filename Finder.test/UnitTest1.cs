@@ -73,7 +73,7 @@ namespace Finder.test
 		public void TestMethod2()
 		{
 			IFileHasherFinder finder = new FileHasherFinder();
-			var task = finder.DoSearch(@"D:\ebooks", "*.pdf", true);
+			var task = finder.DoSearch(@"D:\eBooks", "*.pdf", true);
 
 			try
 			{
@@ -108,7 +108,7 @@ namespace Finder.test
 					foreach (var val in gpList1)
 					{
 						string files = string.Join(Environment.NewLine, from file in val.Data select file.PathToFile);
-						if(files!=null)
+						if (files != null)
 						{
 
 						}
@@ -120,7 +120,6 @@ namespace Finder.test
 		[TestMethod]
 		public void TestMethodReadAsync()
 		{
-
 			var task2 = FileHasherFinder.ReadFileAsync(@"D:\eBooks\Professional Visual Studio 2010.pdf", 1024);
 			try
 			{
