@@ -22,6 +22,7 @@
 	<DockPanel>
 		<Menu DockPanel.Dock="Top">
 			<MenuItem Header="_File">
+                <MenuItem Header="_Clear" Click="MenuItem_Click_1"/>
 				<Separator></Separator>
 				<MenuItem x:Name="miExit" Header="_Exit" Click="miExit_Click"/>
 			</MenuItem>

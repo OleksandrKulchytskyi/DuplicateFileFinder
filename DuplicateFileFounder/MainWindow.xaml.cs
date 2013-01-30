@@ -33,10 +33,10 @@ namespace DuplicateFileFounder
 			aggregateCatalogue.Catalogs.Add(new AssemblyCatalog(System.Reflection.Assembly.GetExecutingAssembly()));
 			aggregateCatalogue.Catalogs.Add(new AssemblyCatalog(typeof(IFileHasherFinder).Assembly));
 			//aggregateCatalogue.Catalogs.Add(new DirectoryCatalog(AppDomain.CurrentDomain.BaseDirectory));
-			
+
 			CompositionContainer container = new CompositionContainer(aggregateCatalogue);
 			container.ComposeParts(this);
-			
+
 			_listExtensions = new List<string>();
 			this.Loaded += new RoutedEventHandler(MainWindow_Loaded);
 		}
@@ -163,6 +163,28 @@ namespace DuplicateFileFounder
 		private void miExit_Click(object send, RoutedEventArgs e)
 		{
 			App.Current.Shutdown();
+		}
+
+		private void MenuItem_Click_1(object sender, RoutedEventArgs e)
+		{
+			bool purged = false;
+			if (dg1.ItemsSource != null && (dg1.ItemsSource as ObservableCollection<DuplicateItem>).Count > 0)
+			{
+				(dg1.ItemsSource as ObservableCollection<DuplicateItem>).Clear();
+				dg1.ItemsSource = null;
+				purged = true;
+			}
+			else if (dg1.ItemsSource != null && (dg1.ItemsSource is ListCollectionView))
+			{
+				dg1.ItemsSource = null;
+				purged = true;
+			}
+			if (purged)
+			{
+				GC.Collect();
+				GC.WaitForPendingFinalizers();
+				GC.Collect();
+			}
 		}
 	}
 }
