@@ -1,13 +1,10 @@
 ﻿using FileHelper.Common;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel.Composition;
 using System.ComponentModel.Composition.Hosting;
 using System.IO;
-using System.Linq;
-using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -21,9 +18,9 @@ namespace DuplicateFileFounder
 	public partial class MainWindow : Window
 	{
 		private List<string> _listExtensions = null;
+
 		[Import(typeof(IFileHasherFinder))]
 		private IFileHasherFinder _finderCore;
-
 
 		public MainWindow()
 		{
@@ -32,6 +29,7 @@ namespace DuplicateFileFounder
 			AggregateCatalog aggregateCatalogue = new AggregateCatalog();
 			aggregateCatalogue.Catalogs.Add(new AssemblyCatalog(System.Reflection.Assembly.GetExecutingAssembly()));
 			aggregateCatalogue.Catalogs.Add(new AssemblyCatalog(typeof(IFileHasherFinder).Assembly));
+
 			//aggregateCatalogue.Catalogs.Add(new DirectoryCatalog(AppDomain.CurrentDomain.BaseDirectory));
 
 			CompositionContainer container = new CompositionContainer(aggregateCatalogue);

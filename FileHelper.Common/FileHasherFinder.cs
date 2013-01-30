@@ -8,7 +8,6 @@ using System.Linq;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -30,9 +29,10 @@ namespace FileHelper.Common
 			_clusterSize = StreamUtils.GetClusterSize(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
 		}
 
-		class LoopSt
+		private class LoopSt
 		{
 			public int Count { get; set; }
+
 			public bool Exceptional { get; set; }
 		}
 
@@ -98,7 +98,6 @@ namespace FileHelper.Common
 						tcs.TrySetResult(blockColl.GetConsumingEnumerable());
 					else
 						tcs.TrySetResult(null);
-
 				}), TaskCreationOptions.LongRunning);
 			}
 			else
@@ -138,7 +137,7 @@ namespace FileHelper.Common
 			{
 				Tuple<int, int, byte[]> result = null;
 				try
-				{	// If we did not receive the entire file, the end of the data buffer will contain garbage. 
+				{	// If we did not receive the entire file, the end of the data buffer will contain garbage.
 					if (t.Result < buffer.Length)
 						Array.Resize(ref buffer, t.Result);
 
@@ -212,6 +211,7 @@ namespace FileHelper.Common
 		public string PathToFile { get; set; }
 
 		private float myVar;
+
 		[Description("Size (Mb)")]
 		public float Size
 		{
