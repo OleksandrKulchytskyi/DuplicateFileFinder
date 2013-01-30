@@ -122,13 +122,19 @@ namespace FileHelper.Common
 			Task<int> task = Task<int>.Factory.FromAsync(fileStream.BeginRead, fileStream.EndRead, buffer, 0, buffer.Length, null);
 			return task.ContinueWith(t =>
 			{
-				// If we did not receive the entire file, the end of the data buffer will contain garbage. 
-				if (t.Result < buffer.Length)
-					Array.Resize(ref buffer, t.Result);
+				Tuple<int, int, byte[]> result = null;
+				try
+				{	// If we did not receive the entire file, the end of the data buffer will contain garbage. 
+					if (t.Result < buffer.Length)
+						Array.Resize(ref buffer, t.Result);
 
-				var result = Tuple.Create<int, int, byte[]>((int)fileStream.Length, t.Result, buffer); ;
-				fileStream.Dispose();
-				t.Dispose();
+					result = Tuple.Create<int, int, byte[]>((int)fileStream.Length, t.Result, buffer); ;
+				}
+				finally
+				{
+					fileStream.Dispose();
+					t.Dispose();
+				}
 				return result;
 			});
 		}
