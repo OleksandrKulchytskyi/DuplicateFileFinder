@@ -22,6 +22,12 @@ namespace FileHelper.Common
 	{
 		private const int _maxTolerance = 2;
 
+		class LoopSt
+		{
+			public int Count { get; set; }
+			public bool Exceptional { get; set; }
+		}
+
 		public Task<IEnumerable<DuplicateItem>> DoSearch(string fpath, string pattern, bool includeSubFolders)
 		{
 			TaskCompletionSource<IEnumerable<DuplicateItem>> tcs = new TaskCompletionSource<IEnumerable<DuplicateItem>>();
@@ -218,11 +224,5 @@ namespace FileHelper.Common
 				return false;
 			return this.ShaCode.Equals(other.ShaCode, StringComparison.OrdinalIgnoreCase);
 		}
-	}
-
-	class LoopSt
-	{
-		public int Count { get; set; }
-		public bool Exceptional { get; set; }
 	}
 }
