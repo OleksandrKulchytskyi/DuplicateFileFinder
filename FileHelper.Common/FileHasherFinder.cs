@@ -21,6 +21,12 @@ namespace FileHelper.Common
 	public class FileHasherFinder : IFileHasherFinder
 	{
 		private const int _maxTolerance = 2;
+		private readonly int _clusterSize;
+
+		public FileHasherFinder()
+		{
+			_clusterSize = StreamUtils.GetClusterSize(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
+		}
 
 		class LoopSt
 		{
@@ -115,7 +121,7 @@ namespace FileHelper.Common
 			}
 		}
 
-		public static Task<Tuple<int, int, byte[]>> ReadFileAsync(string filePath, int buffLength)
+		private Task<Tuple<int, int, byte[]>> ReadFileAsync(string filePath, int buffLength)
 		{
 			FileInfo fi = new FileInfo(filePath);
 			if (!fi.Exists)
@@ -124,7 +130,7 @@ namespace FileHelper.Common
 
 			byte[] buffer = new byte[buffLength];
 
-			var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.None, buffer.Length, FileOptions.Asynchronous);
+			var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.None, _clusterSize, FileOptions.Asynchronous);
 			Task<int> task = Task<int>.Factory.FromAsync(fileStream.BeginRead, fileStream.EndRead, buffer, 0, buffer.Length, null);
 			return task.ContinueWith(t =>
 			{
@@ -145,7 +151,7 @@ namespace FileHelper.Common
 			});
 		}
 
-		public static Task<Tuple<byte[], int>> ReadBufferAsync(string file, int bufferSize)
+		private Task<Tuple<byte[], int>> ReadBufferAsync(string file, int bufferSize)
 		{
 			TaskCompletionSource<Tuple<byte[], int>> tcs = new TaskCompletionSource<Tuple<byte[], int>>();
 			if (!File.Exists(file))
@@ -154,7 +160,7 @@ namespace FileHelper.Common
 			}
 			var buffer = new byte[bufferSize];
 			int read = -1;
-			FileStream fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None, bufferSize, FileOptions.Asynchronous);
+			FileStream fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None, _clusterSize, FileOptions.Asynchronous);
 
 			Task<int> task = null;
 			try

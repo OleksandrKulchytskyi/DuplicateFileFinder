@@ -73,7 +73,7 @@ namespace Finder.test
 		public void TestMethod2()
 		{
 			IFileHasherFinder finder = new FileHasherFinder();
-			var task = finder.DoSearch(@"D:\eBooks", "*.pdf", true);
+			var task = finder.DoSearch(@"G:\Work\SkyDrive\eBooks", "*.pdf", true);
 
 			try
 			{
@@ -115,34 +115,6 @@ namespace Finder.test
 					}
 				}
 			}
-		}
-
-		[TestMethod]
-		public void TestMethodReadAsync()
-		{
-			var task2 = FileHasherFinder.ReadFileAsync(@"D:\eBooks\Professional Visual Studio 2010.pdf", 1024);
-			try
-			{
-				task2.Wait();
-			}
-			catch (AggregateException ex)
-			{ }
-			catch (Exception ex)
-			{ }
-			if (task2 != null)
-			{
-
-			}
-
-			var task = FileHasherFinder.ReadBufferAsync(@"D:\eBooks\Professional Visual Studio 2010.pdf", 1024);
-			try
-			{
-				task.Wait();
-			}
-			catch (AggregateException ex)
-			{ }
-			catch (Exception ex)
-			{ }
 		}
 	}
 }
