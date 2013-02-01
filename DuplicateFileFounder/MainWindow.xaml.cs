@@ -29,7 +29,6 @@ namespace DuplicateFileFounder
 			AggregateCatalog aggregateCatalogue = new AggregateCatalog();
 			aggregateCatalogue.Catalogs.Add(new AssemblyCatalog(System.Reflection.Assembly.GetExecutingAssembly()));
 			aggregateCatalogue.Catalogs.Add(new AssemblyCatalog(typeof(IFileHasherFinder).Assembly));
-
 			//aggregateCatalogue.Catalogs.Add(new DirectoryCatalog(AppDomain.CurrentDomain.BaseDirectory));
 
 			CompositionContainer container = new CompositionContainer(aggregateCatalogue);
